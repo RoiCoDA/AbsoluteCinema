@@ -129,7 +129,6 @@ export default function HomePage() {
       </div>
 
       {/* --- MAIN CONTENT --- */}
-      {/* Removed 'pt-20' because sticky header takes up natural space now */}
       <main className="w-full md:max-w-7xl md:mx-auto py-8 space-y-8 md:space-y-12">
         {/* Carousel 1 */}
         <section className="w-full">

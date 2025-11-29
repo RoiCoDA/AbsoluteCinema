@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, Loader2, X } from "lucide-react";
 import { MockDatabase } from "../services/mockApi";
+import { useNavigate } from "react-router-dom"; // 1. Import Hook
 
 export default function SearchBar({ isMobile, onClose }) {
   const [query, setQuery] = useState("");
@@ -8,8 +9,10 @@ export default function SearchBar({ isMobile, onClose }) {
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
+  const navigate = useNavigate(); // 2. Initialize Hook
+
   const limit =
-    typeof windown !== "undefined" && window.innerWidth < 768 ? 5 : 10;
+    typeof window !== "undefined" && window.innerWidth < 768 ? 5 : 10;
 
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -28,8 +31,17 @@ export default function SearchBar({ isMobile, onClose }) {
     return () => clearTimeout(timer);
   }, [query, limit]);
 
+  // 3. New Helper Function for Navigation
+  const handleSelectMovie = (movieId) => {
+    navigate(`/movie/${movieId}`); // Go to the URL
+    setQuery(""); // Clear search
+    setShowResults(false); // Hide dropdown
+    if (onClose) onClose(); // Close mobile overlay if open
+  };
+
   return (
     <div className="relative w-full">
+      {/* Input Group */}
       <div className="relative flex items-center">
         <div className="absolute left-3 text-slate-400">
           {loading ? (
@@ -61,6 +73,7 @@ export default function SearchBar({ isMobile, onClose }) {
         )}
       </div>
 
+      {/* Results Dropdown */}
       {showResults && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
           {results.length > 0 ? (
@@ -70,7 +83,8 @@ export default function SearchBar({ isMobile, onClose }) {
                   <li
                     key={movie.id}
                     className="flex items-center gap-3 p-3 hover:bg-slate-700 cursor-pointer border-b border-slate-700/50 last:border-0 transition-colors"
-                    onClick={() => alert(`Navigating to movie ID: ${movie.id}`)} // Unspecified page action
+                    // 4. Connect the click to the helper function
+                    onClick={() => handleSelectMovie(movie.id)}
                   >
                     <div className="w-10 h-14 bg-slate-900 rounded overflow-hidden flex-shrink-0">
                       {movie.poster ? (

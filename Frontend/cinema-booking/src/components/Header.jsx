@@ -40,11 +40,16 @@ export default function Header() {
             {/* Desktop User Section */}
             <div className="hidden md:flex items-center gap-4 text-sm font-medium text-slate-400">
               {user ? (
-                // Logged In View
                 <>
-                  <div className="flex items-center gap-3">
-                    <span className="text-slate-200">{user.userFullName}</span>
-                    <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-emerald-900/20 cursor-default">
+                  {/* Added onClick -> navigate to profile */}
+                  <div
+                    className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => navigate("/profile")}
+                  >
+                    <span className="text-slate-200">
+                      {user.username || user.userFullName}
+                    </span>
+                    <div className="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-emerald-900/20">
                       {user.userFullName.charAt(0)}
                     </div>
                   </div>
@@ -117,7 +122,13 @@ export default function Header() {
           <div className="flex-1 p-6 flex flex-col gap-6">
             {/* User Section in Drawer */}
             {user ? (
-              <div className="bg-slate-800 p-4 rounded-xl flex items-center gap-4">
+              <div
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate("/profile");
+                }} // Add navigation here
+                className="bg-slate-800 p-4 rounded-xl flex items-center gap-4 cursor-pointer active:scale-95 transition-transform"
+              >
                 <div className="w-12 h-12 bg-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
                   {user.userFullName.charAt(0)}
                 </div>

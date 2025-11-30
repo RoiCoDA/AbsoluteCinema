@@ -9,6 +9,7 @@ import {
   AlertCircle,
 } from "lucide-react"; // Added AlertCircle
 import { MockDatabase } from "../services/mockApi";
+import { useToast } from "../context/ToastContext";
 
 export default function CreateRoomModal({ movieId, onClose, onSuccess }) {
   const [step, setStep] = useState(1);
@@ -18,6 +19,8 @@ export default function CreateRoomModal({ movieId, onClose, onSuccess }) {
   const [partner, setPartner] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { showToast } = useToast();
 
   useEffect(() => {
     MockDatabase.getCities().then(setCities);
@@ -50,6 +53,10 @@ export default function CreateRoomModal({ movieId, onClose, onSuccess }) {
 
     setIsSubmitting(false);
     setStep(4);
+
+    // 3. Trigger Toast
+    showToast("Room created successfully!", "success");
+
     if (onSuccess) onSuccess();
   };
 

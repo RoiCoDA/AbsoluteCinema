@@ -13,11 +13,13 @@ import { MockDatabase } from "../services/mockApi";
 import { useAuth } from "../context/AuthContext";
 import Header from "../components/Header";
 import AuthModal from "../components/AuthModal";
+import { useToast } from "../context/ToastContext";
 
 export default function RoomPage() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,9 +63,18 @@ export default function RoomPage() {
     }
 
     setVoting(true);
-    await MockDatabase.voteForRoom(room.roomAId, user.userId);
-    await handleRefresh(); // Use the separate handler
+    // 3. Capture Result
+    const result = await MockDatabase.voteForRoom(room.roomAId, user.userId);
+
     setVoting(false);
+
+    // 4. Show Affirmation or Error
+    if (result.success) {
+      showToast(`Vote recorded! Count: ${result.newCount}`, "success");
+      await handleRefresh();
+    } else {
+      showToast(result.message || "Could not vote", "error");
+    }
   };
 
   const handleBook = () => {
@@ -84,8 +95,8 @@ export default function RoomPage() {
       </div>
     );
 
-  const isCreator = user && room.createdByUserId === user.userId;
   const isRoomB = room.type === "B";
+  const canVote = user && room.createdByUserId !== user.userId;
 
   return (
     <div className="fixed inset-0 w-full h-full bg-slate-900 text-slate-100 font-sans overflow-y-auto overflow-x-hidden z-50">
@@ -198,15 +209,24 @@ export default function RoomPage() {
                 ) : (
                   <button
                     onClick={handleVote}
-                    disabled={isCreator || voting}
-                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-slate-700 disabled:text-slate-500 text-slate-900 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                    // Disable if: Not logged in (optional, but we redirect), Is Creator, or Loading
+                    disabled={voting || (user && !canVote)}
+                    className={`w-full font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 ${
+                      user && !canVote
+                        ? "bg-slate-700 text-slate-500 cursor-not-allowed"
+                        : "bg-amber-500 hover:bg-amber-400 text-slate-900"
+                    }`}
                   >
                     {voting ? (
                       <Loader2 className="animate-spin" />
                     ) : (
                       <Vote size={20} />
                     )}
-                    {isCreator ? "You started this!" : "I'm Interested (+1)"}
+                    {!user
+                      ? "I'm Interested (+1)"
+                      : canVote
+                      ? "I'm Interested (+1)"
+                      : "You started this!"}
                   </button>
                 )}
               </div>

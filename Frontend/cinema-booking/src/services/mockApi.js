@@ -30,31 +30,36 @@ const saveToStorage = (key, data) => {
 // USERS
 // =====================================================
 let USERS_TABLE = getPersistedData("db_users", [
-  // {
-  //   userId,
-  //   userPhoneNumber,   // unique
-  //   userFullName,
-  //   isUserBanned,
-  //   createdAt,
-  // }
   {
     userId: "u001",
+    username: "Aliiiiz", // Changed from userName
     userPhoneNumber: "+972501234567",
     userFullName: "Alice Levi",
+    score: 120,
+    title: "Film Buff",
+    homeCityId: "c001",
     isUserBanned: false,
     createdAt: "2025-01-20T10:12:00Z",
   },
   {
     userId: "u002",
+    username: "DanDan", // Changed from userName
     userPhoneNumber: "+972541112223",
     userFullName: "Dan Cohen",
+    score: 450,
+    title: "Visionary",
+    homeCityId: "c003",
     isUserBanned: false,
     createdAt: "2025-01-21T09:00:00Z",
   },
   {
     userId: "u003",
-    userPhoneNumber: "+972539876543",
-    userFullName: "Noam Mizrahi",
+    username: "", // Changed from userName
+    userPhoneNumber: "+972500000000",
+    userFullName: "Gnome Chompski",
+    score: 0,
+    title: "Bingus",
+    homeCityId: "c002",
     isUserBanned: false,
     createdAt: "2025-01-22T14:55:00Z",
   },
@@ -213,7 +218,7 @@ const ROOM_A_TABLE = getPersistedData("db_room_a", [
 ]);
 
 // --- Room A Votes
-const ROOM_A_VOTES_TABLE = getPersistedData("db_room_b", [
+const ROOM_A_VOTES_TABLE = getPersistedData("db_room_a_votes", [
   // {
   //   roomAVoteId,
   //   roomAId,           // FK -> ROOM_A_TABLE
@@ -802,13 +807,15 @@ export const MockDatabase = {
     return new Promise((resolve) => {
       setTimeout(() => {
         let user = USERS_TABLE.find((u) => u.userPhoneNumber === phoneNumber);
-
-        // If new user, create them
         if (!user) {
           user = {
             userId: `u${Date.now()}`,
             userPhoneNumber: phoneNumber,
-            userFullName: `User ${phoneNumber.slice(-4)}`, // Default name
+            userFullName: `User ${phoneNumber.slice(-4)}`,
+            username: `user_${phoneNumber.slice(-4)}`, // Standardized
+            score: 0,
+            title: "Newcomer",
+            homeCityId: "",
             isUserBanned: false,
             createdAt: new Date().toISOString(),
           };
@@ -816,10 +823,150 @@ export const MockDatabase = {
           saveToStorage("db_users", USERS_TABLE);
           console.log("New User Registered:", user);
         }
-
         resolve(user);
       }, 800);
     });
+  },
+
+  loginUser: async (phoneNumber) => {
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        const user = USERS_TABLE.find((u) => u.userPhoneNumber === phoneNumber);
+        resolve(user || null);
+      }, 600)
+    );
+  },
+
+  checkUsernameAvailable: async (usernameToCheck) => {
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        const taken = USERS_TABLE.some(
+          (u) =>
+            (u.username || "").toLowerCase() === usernameToCheck.toLowerCase()
+        );
+        resolve(!taken);
+      }, 400)
+    );
+  },
+
+  registerUser: async (payload) => {
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        const newUser = {
+          userId: `u${Date.now()}`,
+          username: payload.userName, // Map Payload to DB field
+          userPhoneNumber: payload.userPhoneNumber,
+          userFullName: payload.userFullName || payload.userName,
+          score: 0,
+          title: "Newcomer",
+          homeCityId: "",
+          isUserBanned: false,
+          createdAt: new Date().toISOString(),
+        };
+
+        USERS_TABLE.push(newUser);
+        saveToStorage("db_users", USERS_TABLE);
+        resolve(newUser);
+      }, 800)
+    );
+  },
+
+  // 4. Update Profile
+  updateUserProfile: async (userId, updates) => {
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        const idx = USERS_TABLE.findIndex((u) => u.userId === userId);
+        if (idx === -1) {
+          resolve(null);
+          return;
+        }
+
+        // Uniqueness check for updates
+        if (updates.username) {
+          const nameTaken = USERS_TABLE.some(
+            (u) =>
+              u.username.toLowerCase() === updates.username.toLowerCase() &&
+              u.userId !== userId
+          );
+          if (nameTaken) {
+            resolve({ error: "Username taken" });
+            return;
+          }
+        }
+
+        USERS_TABLE[idx] = { ...USERS_TABLE[idx], ...updates };
+        saveToStorage("db_users", USERS_TABLE);
+        resolve(USERS_TABLE[idx]);
+      }, 400)
+    );
+  },
+
+  // 2. THE BIG AGGREGATOR (History & Future)
+  getUserActivity: async (userId) => {
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        // A. My Tickets (Future Screenings)
+        // Find bookings -> Join Room B -> Join Movie -> Join Location
+        const tickets = ROOM_B_BOOKINGS_TABLE.filter((b) => b.userId === userId)
+          .map((booking) => {
+            const room = ROOM_B_TABLE.find(
+              (r) => r.roomBId === booking.roomBId
+            );
+            if (!room) return null;
+            const movie = MOVIES_TABLE.find((m) => m.movieId === room.movieId);
+            const loc = COMPANIES_LOCATIONS_TABLE.find(
+              (l) => l.companyLocationId === room.locationId
+            );
+            const seat = generalInitialLayout().find(
+              (s) => s.id === booking.roomBSeatId
+            ); // Re-using layout logic to get seat label
+
+            return {
+              id: booking.roomBBookingId,
+              type: "ticket",
+              movieTitle: movie?.movieTitle,
+              posterUrl: movie?.posterUrl,
+              date: room.createdAt, // Mock date, in real app Room B needs a 'screeningDate'
+              location: loc?.locationName,
+              seatLabel: seat ? `${seat.row}-${seat.number}` : "??",
+              price: seat?.price,
+            };
+          })
+          .filter(Boolean);
+
+        // B. My Proposals (Room A Created)
+        const proposals = ROOM_A_TABLE.filter(
+          (r) => r.createdByUserId === userId
+        ).map((room) => {
+          const movie = MOVIES_TABLE.find((m) => m.movieId === room.movieId);
+          return {
+            id: room.roomAId,
+            type: "proposal",
+            movieTitle: movie?.movieTitle,
+            status: room.status, // active vs converted
+            voteCount: room.voteCount,
+            target: 50, // Mock target
+          };
+        });
+
+        // C. My Votes (Interest)
+        const votes = ROOM_A_VOTES_TABLE.filter((v) => v.userId === userId)
+          .map((vote) => {
+            const room = ROOM_A_TABLE.find((r) => r.roomAId === vote.roomAId);
+            if (!room) return null;
+            const movie = MOVIES_TABLE.find((m) => m.movieId === room.movieId);
+            return {
+              id: vote.roomAVoteId,
+              type: "vote",
+              movieTitle: movie?.movieTitle,
+              roomStatus: room.status,
+            };
+          })
+          .filter(Boolean);
+
+        resolve({ tickets, proposals, votes });
+      }, 700)
+    );
   },
 
   ///////// Room logic
@@ -870,30 +1017,48 @@ export const MockDatabase = {
     return new Promise((resolve) =>
       setTimeout(() => {
         const room = ROOM_A_TABLE.find((r) => r.roomAId === roomAId);
-        if (room) {
-          const existing = ROOM_A_VOTES_TABLE.find(
-            (v) => v.roomAId === roomAId && v.userId === userId
-          );
-          if (!existing) {
-            room.voteCount += 1;
-            ROOM_A_VOTES_TABLE.push({
-              roomAVoteId: `rv${Date.now()}`,
-              roomAId,
-              userId,
-              voteValue: 1,
-              createdAt: new Date().toISOString(),
-            });
-            saveToStorage("db_room_a", ROOM_A_TABLE);
-            saveToStorage("db_room_a_votes", ROOM_A_VOTES_TABLE);
-          }
+
+        if (!room) {
+          resolve({ success: false, message: "Room not found" });
+          return;
         }
-        resolve({ success: true, newCount: room ? room.voteCount : 0 });
+
+        // 1. BLOCK CREATOR
+        if (room.createdByUserId === userId) {
+          resolve({
+            success: false,
+            message: "You cannot vote for your own room!",
+          });
+          return;
+        }
+
+        // 2. CHECK EXISTING VOTE
+        const existing = ROOM_A_VOTES_TABLE.find(
+          (v) => v.roomAId === roomAId && v.userId === userId
+        );
+
+        if (!existing) {
+          room.voteCount += 1;
+          ROOM_A_VOTES_TABLE.push({
+            roomAVoteId: `rv${Date.now()}`,
+            roomAId,
+            userId,
+            voteValue: 1,
+            createdAt: new Date().toISOString(),
+          });
+          saveToStorage("db_room_a", ROOM_A_TABLE);
+          saveToStorage("db_room_a_votes", ROOM_A_VOTES_TABLE);
+          resolve({ success: true, newCount: room.voteCount });
+        } else {
+          resolve({
+            success: false,
+            message: "You already voted for this room.",
+          });
+        }
       }, 500)
     );
   },
 
-  // --- HERE IS THE BIG CHANGE ---
-  // We generate the layout on the fly, then overlay the bookings from the DB.
   getRoomSeats: async (roomBId) => {
     return new Promise((resolve) =>
       setTimeout(() => {
@@ -944,6 +1109,56 @@ export const MockDatabase = {
 
         resolve({ success: true });
       }, 1500)
+    );
+  },
+
+  // NEW: Get rooms enriched with Movie & Location data for the Home Page
+  getDiscoveryRooms: async () => {
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        // Helper to hydrate a room with Movie + Location info
+        const hydrateForHome = (room, forcedType) => {
+          const movie = MOVIES_TABLE.find((m) => m.movieId === room.movieId);
+          const loc = COMPANIES_LOCATIONS_TABLE.find(
+            (l) => l.id === room.locationId
+          );
+          const city = CITIES_TABLE.find((c) => c.cityId === room.cityId);
+
+          // Calculate Stats
+          let statCount = 0;
+          if (forcedType === "A") {
+            statCount = room.voteCount;
+          } else {
+            // For Room B, count actual bookings
+            statCount = ROOM_B_BOOKINGS_TABLE.filter(
+              (b) => b.roomBId === room.roomBId
+            ).length;
+          }
+
+          return {
+            id: forcedType === "A" ? room.roomAId : room.roomBId,
+            type: forcedType, // FORCE the type passed by the caller
+            movieTitle: movie?.movieTitle,
+            posterUrl: movie?.posterUrl,
+            releaseYear: movie?.releaseYear,
+            locationName: loc?.name || "Unknown Location",
+            cityName: city?.cityNameEn,
+            statCount: statCount, // Unified stat field
+          };
+        };
+
+        // 1. Active Proposals (Room A)
+        const proposals = ROOM_A_TABLE.filter((r) => r.status === "active").map(
+          (r) => hydrateForHome(r, "A")
+        ); // Pass 'A' explicitly
+
+        // 2. Open Screenings (Room B)
+        const screenings = ROOM_B_TABLE.filter(
+          (r) => r.status === "bookable"
+        ).map((r) => hydrateForHome(r, "B")); // Pass 'B' explicitly
+
+        resolve({ proposals, screenings });
+      }, 600)
     );
   },
 };
